@@ -1,6 +1,6 @@
 {
     "name": "essabu/toli",
-    "description": "SDK PHP officiel de Toli — décisions typées avec confiance calibrée, et la règle des trois voies (agir / proposer / escalader).",
+    "description": "Official PHP SDK for Toli — typed decisions with a calibrated confidence, and the three-route rule (act / confirm / escalate).",
     "type": "library",
     "license": "MIT",
     "keywords": [
