@@ -17,6 +17,7 @@ use Essabu\Toli\Thresholds;
 use Essabu\Toli\Toli;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 /**
  * The shared conformance suite, replayed against the PHP SDK.
@@ -338,11 +339,26 @@ final class ConformanceTest extends TestCase
         );
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * The shared fixtures, wherever this package is sitting.
+     *
+     * Two layouts must work: the monorepo, where spec/ is one level above the
+     * language folder, and the published mirror, where it was vendored at the
+     * root. A hard-coded path passes in one and fails in the other — which is
+     * exactly what happened the first time a mirror was cloned.
+     *
+     * @return array<string, mixed>
+     */
     private static function spec(string $file): array
     {
-        $path = __DIR__.'/../../spec/conformance/'.$file;
+        foreach ([__DIR__.'/../spec', __DIR__.'/../../spec'] as $base) {
+            $path = $base.'/conformance/'.$file;
 
-        return json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+            if (is_file($path)) {
+                return json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+            }
+        }
+
+        throw new RuntimeException("Conformance fixtures not found: {$file}");
     }
 }
