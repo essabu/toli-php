@@ -1,0 +1,57 @@
+{
+    "name": "essabu/toli",
+    "description": "SDK PHP officiel de Toli — décisions typées avec confiance calibrée, et la règle des trois voies (agir / proposer / escalader).",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "toli",
+        "essabu",
+        "sdk",
+        "classification",
+        "decision",
+        "ai"
+    ],
+    "homepage": "https://toli.essabu.com",
+    "authors": [
+        {
+            "name": "Essabu",
+            "email": "dev@essabu.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "ext-json": "*",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0"
+    },
+    "require-dev": {
+        "guzzlehttp/guzzle": "^7.8",
+        "laravel/pint": "^1.18",
+        "nyholm/psr7": "^1.8",
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^11.0"
+    },
+    "suggest": {
+        "guzzlehttp/guzzle": "Client HTTP PSR-18 prêt à l'emploi (toute implémentation PSR-18 convient)."
+    },
+    "autoload": {
+        "psr-4": {
+            "Essabu\\Toli\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Essabu\\Toli\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "lint": "pint --test",
+        "stan": "phpstan analyse"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true
+    }
+}
