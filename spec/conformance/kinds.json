@@ -1,0 +1,48 @@
+{
+  "$comment": "The catalogue as the gateway serves it, and what every SDK must do with a kind it was not compiled with. Under contract version 1 every case below was a protocol error.",
+  "contract_version": 2,
+  "catalogue": {
+    "contract_version": 2,
+    "categories": [
+      { "name": "decision", "kinds": ["choice", "noul"] },
+      { "name": "measure", "kinds": ["score"] },
+      { "name": "extraction", "kinds": ["extract"] },
+      { "name": "ordering", "kinds": [] }
+    ],
+    "kinds": [
+      { "name": "choice", "category": "decision", "question": { "required": ["instructions", "criteria"], "optional": [] }, "answer": ["choice", "confidence", "probabilities"], "certainty": "confidence", "since": 1 },
+      { "name": "noul", "category": "decision", "question": { "required": ["instructions"], "optional": [] }, "answer": ["noul"], "certainty": "noul", "since": 1 },
+      { "name": "score", "category": "measure", "question": { "required": ["instructions"], "optional": ["criteria"] }, "answer": ["score", "confidence", "legend"], "certainty": "confidence", "since": 1 },
+      { "name": "extract", "category": "extraction", "question": { "required": ["instructions", "fields"], "optional": [] }, "answer": ["extract", "confidence"], "certainty": "confidence", "since": 3 }
+    ]
+  },
+  "cases": [
+    {
+      "name": "the catalogue is read with a GET, under the same key",
+      "request": { "method": "GET", "path": "/v1/kinds" },
+      "expect": { "names": ["choice", "noul", "score", "extract"], "under_decision": ["choice", "noul"], "under_ordering": [], "required_extract": ["instructions", "fields"], "certainty_noul": "noul" }
+    },
+    {
+      "name": "a generic question travels with its own fields untouched",
+      "generic": { "kind": "extract", "instructions": "Pull out the dates.", "fields": { "fields": ["signed"] } },
+      "expect_wire": { "kind": "extract", "instructions": "Pull out the dates.", "fields": ["signed"] }
+    },
+    {
+      "name": "an answer of an unknown shape is read as the kind that was asked",
+      "asked_kind": "extract",
+      "answer": { "extract": { "signed": "2026-09-21" }, "confidence": 0.91 },
+      "expect": { "kind": "extract", "value": { "signed": "2026-09-21" }, "certainty": 0.91, "route": "act" }
+    },
+    {
+      "name": "an answer without confidence escalates rather than guesses",
+      "asked_kind": "rank",
+      "answer": { "rank": ["b", "a", "c"] },
+      "expect": { "kind": "rank", "certainty": 0.0, "route": "escalate" }
+    },
+    {
+      "name": "a generic question may not smuggle its own kind as a field",
+      "generic": { "kind": "extract", "instructions": "x", "fields": { "kind": "choice" } },
+      "expect_error": "config"
+    }
+  ]
+}
