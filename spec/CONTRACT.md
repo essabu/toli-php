@@ -11,17 +11,28 @@ SDK replays them, and they must all reach the same verdict.
 
 ---
 
-## 1. The three questions
+## 1. The catalogue of questions
 
-A question always carries `instructions`: what is being asked, in English (the
-model is trained on English first — measure before writing them in another
-language).
+A question always carries `kind` and `instructions`: what is being asked, in
+English (the model is trained on English first — measure before writing them
+in another language).
 
-| Form | What you ask | What comes back |
-|---|---|---|
-| **Choice** | one option out of a **closed** set | `choice`, per-option `probabilities`, `confidence` |
-| **Score** | a degree on **ordered, described** levels | `score` (float), `legend`, `confidence` |
-| **Noul** | is this statement true | `noul` = probability of yes — **no `confidence`** |
+**The set of kinds is a catalogue, not a list in this file.** The gateway
+serves it at `GET /v1/kinds` (scope `usage`), grouped by category, and it grows
+by registration on the gateway — never by a release of an SDK. For each kind
+the catalogue says which fields a question must and may carry, which fields
+the answer returns, and where certainty lives (`confidence`, `noul`, or
+`none`).
+
+Three kinds are **built in**, with a typed helper in every SDK and a shape
+that is frozen — a registration may refine their description, never their
+fields:
+
+| Kind | Category | What you ask | What comes back |
+|---|---|---|---|
+| **Choice** | decision | one option out of a **closed** set | `choice`, per-option `probabilities`, `confidence` |
+| **Score** | measure | a degree on **ordered, described** levels | `score` (float), `legend`, `confidence` |
+| **Noul** | decision | is this statement true | `noul` = probability of yes — **no `confidence`** |
 
 **Choice** requires at least two options and **always an escape hatch**
 (`other`, `none`, `unknown`…). Without one, the model is forced to pick between
@@ -29,6 +40,21 @@ boxes that do not describe the case, and the confidence it returns stops meaning
 anything. An SDK REJECTS a `Choice` with fewer than two options.
 
 **Score** requires levels ordered from weakest to strongest, each one described.
+
+**Every other kind** is asked through the SDK's generic question — `kind`,
+`instructions`, and the fields the catalogue names, sent exactly as given. The
+SDK validates nothing about a generic question: the gateway is what knows the
+kind, and it refuses with the missing field named. An answer of a shape the
+SDK has no typed reading for is returned as served, with certainty taken from
+`confidence` when the engine gives one and the route **ESCALATE** when it does
+not — a route decided on nothing is a route decided by a person.
+
+Categories are declared before they are populated: `decision`, `measure`,
+`extraction`, `ordering`. An SDK may render them as headings without knowing
+every kind under them.
+
+**Contract version 2.** Version 1 had the three kinds as the boundary; an SDK
+at version 1 still works against the gateway for those three.
 
 ---
 
