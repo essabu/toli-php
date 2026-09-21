@@ -16,22 +16,26 @@ use Essabu\Toli\Exception\ToliProtocolError;
 final readonly class Answer
 {
     /**
-     * @param  'choice'|'score'|'noul'  $kind
+     * @param  string  $kind  `choice`, `score`, `noul`, or any kind the catalogue lists
+     * @param  string|float|array<string, mixed>|null  $value
      * @param  array<string, float>  $probabilities
+     * @param  array<string, mixed>  $raw  the answer as served, for a kind with no typed reading
      */
     private function __construct(
         public string $kind,
-        public string|float $value,
+        public string|float|array|null $value,
         public float $certainty,
         public Route $route,
         public array $probabilities = [],
         public ?string $legend = null,
+        public array $raw = [],
     ) {}
 
     /**
      * @param  array<string, mixed>  $raw
+     * @param  string|null  $askedKind  the kind the question was, when the caller knows it
      */
-    public static function parse(string $name, array $raw, Thresholds $thresholds): self
+    public static function parse(string $name, array $raw, Thresholds $thresholds, ?string $askedKind = null): self
     {
         if (array_key_exists('choice', $raw)) {
             $confidence = self::float($raw, 'confidence');
@@ -61,7 +65,27 @@ final readonly class Answer
             return self::fromNoul((float) $raw['noul'], $thresholds);
         }
 
-        throw new ToliProtocolError("Answer \"{$name}\" has an unknown shape: neither choice, score, nor noul.");
+        // A kind this SDK has no typed reading for. It used to be a protocol
+        // error, which made an SDK release the thing standing between a
+        // customer and a kind the gateway already served. Now: the answer as
+        // served, certainty from `confidence` when the engine gives one, and
+        // ESCALATE when it does not — a route decided on nothing is a route
+        // decided by a person.
+        if ($askedKind === null || $askedKind === '') {
+            throw new ToliProtocolError("Answer \"{$name}\" has an unknown shape and no kind was asked for it.");
+        }
+
+        $confidence = array_key_exists('confidence', $raw) ? self::float($raw, 'confidence') : null;
+        $value = $raw;
+        unset($value['confidence']);
+
+        return new self(
+            kind: $askedKind,
+            value: count($value) === 1 ? reset($value) : $value,
+            certainty: $confidence ?? 0.0,
+            route: $confidence === null ? Route::Escalate : $thresholds->route($confidence),
+            raw: $raw,
+        );
     }
 
     /**
@@ -80,6 +104,28 @@ final readonly class Answer
             certainty: $certainty,
             route: $thresholds->route($certainty),
         );
+    }
+
+    /**
+     * The answer as it came over the wire, rebuilt from what was parsed.
+     *
+     * @return array<string, mixed>
+     */
+    public function wire(): array
+    {
+        if ($this->raw !== []) {
+            // A kind with no typed reading carries its name alongside, so a
+            // store can hand the row back to `Reading::parse` knowing what
+            // it was. The three built-ins are told apart by their own field.
+            return $this->raw + ['_kind' => $this->kind];
+        }
+
+        return match ($this->kind) {
+            'choice' => ['choice' => $this->value, 'confidence' => $this->certainty, 'probabilities' => $this->probabilities],
+            'score' => ['score' => $this->value, 'confidence' => $this->certainty] + ($this->legend !== null ? ['legend' => $this->legend] : []),
+            'noul' => ['noul' => $this->value],
+            default => $this->raw,
+        };
     }
 
     /** True when Toli leans towards yes — only meaningful for a Noul. */
@@ -103,6 +149,7 @@ final readonly class Answer
             'route' => $this->route->value,
             'probabilities' => $this->probabilities,
             'legend' => $this->legend,
+            'raw' => $this->raw === [] ? null : $this->raw,
         ];
     }
 

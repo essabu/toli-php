@@ -31,7 +31,7 @@ use Psr\Http\Message\StreamFactoryInterface;
  */
 final class Toli
 {
-    public const CONTRACT_VERSION = 1;
+    public const CONTRACT_VERSION = 2;
 
     private readonly Thresholds $thresholds;
 
@@ -78,8 +78,10 @@ final class Toli
         }
 
         $wire = [];
+        $kinds = [];
         foreach ($questions as $name => $question) {
             $wire[(string) $name] = $question->toArray();
+            $kinds[(string) $name] = (string) ($wire[(string) $name]['kind'] ?? '');
         }
 
         $model ??= $this->model;
@@ -97,10 +99,47 @@ final class Toli
             );
         }
 
-        return Reading::parse($decoded, $model, $this->thresholds);
+        return Reading::parse($decoded, $model, $this->thresholds, $kinds);
     }
 
-    private function send(string $body): ResponseInterface
+    /** The model asked for when a call names none. */
+    public function defaultModel(): string
+    {
+        return $this->model;
+    }
+
+    /**
+     * The catalogue of question kinds the gateway answers.
+     *
+     * Read it once and keep it: it changes by registration on the gateway,
+     * which is rarer than a deploy of yours. Anything it lists can be asked —
+     * the built-ins through their typed helpers, the rest through
+     * `Question\Generic` with the fields the catalogue names.
+     */
+    public function kinds(): Catalogue
+    {
+        $url = $this->transport->kindsUrl();
+
+        if ($url === null) {
+            throw new ToliConfigError('The kinds catalogue is served by the gateway; this transport has none.');
+        }
+
+        $response = $this->send('', 'GET', $url);
+
+        $decoded = json_decode((string) $response->getBody(), true);
+        if (! is_array($decoded)) {
+            throw new ToliProtocolError(
+                'Unreadable catalogue: expected JSON.',
+                status: $response->getStatusCode(),
+                requestId: $this->requestId($response),
+                bodyExcerpt: ToliException::excerpt((string) $response->getBody()),
+            );
+        }
+
+        return Catalogue::parse($decoded);
+    }
+
+    private function send(string $body, string $method = 'POST', ?string $url = null): ResponseInterface
     {
         $attempt = 0;
 
@@ -108,11 +147,16 @@ final class Toli
             $attempt++;
 
             try {
-                $request = $this->requests->createRequest('POST', $this->transport->url())
+                $request = $this->requests->createRequest($method, $url ?? $this->transport->url())
                     ->withHeader('Authorization', 'Bearer '.$this->apiKey)
-                    ->withHeader('Content-Type', 'application/json')
-                    ->withHeader('User-Agent', 'toli-php/'.self::CONTRACT_VERSION)
-                    ->withBody($this->streams->createStream($body));
+                    ->withHeader('Accept', 'application/json')
+                    ->withHeader('User-Agent', 'toli-php/'.self::CONTRACT_VERSION);
+
+                if ($body !== '') {
+                    $request = $request
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withBody($this->streams->createStream($body));
+                }
 
                 $response = $this->http->sendRequest($request);
             } catch (ClientExceptionInterface $e) {

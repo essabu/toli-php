@@ -17,6 +17,12 @@ interface Transport
     public function url(): string;
 
     /**
+     * Absolute URL of the kinds catalogue, or null where this transport has
+     * none — the provider-direct path serves readings, not a contract.
+     */
+    public function kindsUrl(): ?string;
+
+    /**
      * The request body, in the shape this transport expects.
      *
      * @param  string|array<string, mixed>  $state

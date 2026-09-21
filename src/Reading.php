@@ -23,8 +23,11 @@ final readonly class Reading
 
     /**
      * @param  array<string, mixed>  $body
+     * @param  array<string, string>  $kinds  question name => the kind that was asked,
+     *                                        so an answer of a shape this SDK does not
+     *                                        know is still read as what it is
      */
-    public static function parse(array $body, string $requestedModel, Thresholds $thresholds): self
+    public static function parse(array $body, string $requestedModel, Thresholds $thresholds, array $kinds = []): self
     {
         if (! isset($body['answers']) || ! is_array($body['answers'])) {
             throw new ToliProtocolError(
@@ -36,7 +39,7 @@ final readonly class Reading
         $answers = [];
         foreach ($body['answers'] as $name => $raw) {
             if (is_array($raw)) {
-                $answers[(string) $name] = Answer::parse((string) $name, $raw, $thresholds);
+                $answers[(string) $name] = Answer::parse((string) $name, $raw, $thresholds, $kinds[(string) $name] ?? null);
             }
         }
 
@@ -56,6 +59,35 @@ final readonly class Reading
         );
     }
 
+    /**
+     * The reading as the server served it, for a store to keep and `parse()`
+     * to read back. The answers go in their WIRE shape, not their parsed one:
+     * a store that kept the parsed form would freeze this SDK's reading of
+     * it, and a later SDK could not re-read an old row.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        $answers = [];
+        foreach ($this->answers as $name => $answer) {
+            $answers[$name] = $answer->wire();
+        }
+
+        return ['model' => $this->model, 'answers' => $answers, 'usage' => $this->usage];
+    }
+
+    /** @return array<string, string> question name => kind, for re-parsing a kept reading */
+    public function kinds(): array
+    {
+        $kinds = [];
+        foreach ($this->answers as $name => $answer) {
+            $kinds[$name] = $answer->kind;
+        }
+
+        return $kinds;
+    }
+
     public function answer(string $question): Answer
     {
         return $this->answers[$question]
@@ -68,7 +100,13 @@ final readonly class Reading
         return $this->answer($question)->route;
     }
 
-    public function value(string $question): string|float
+    /**
+     * The answer's value: an option, a number, or — for a kind with no typed
+     * reading — the structure the engine returned.
+     *
+     * @return string|float|array<string, mixed>|null
+     */
+    public function value(string $question): string|float|array|null
     {
         return $this->answer($question)->value;
     }

@@ -20,6 +20,12 @@ final readonly class Direct implements Transport
         return rtrim($this->base, '/').'/v1/systemone';
     }
 
+    /** The provider has no catalogue: the kinds are the gateway's contract. */
+    public function kindsUrl(): ?string
+    {
+        return null;
+    }
+
     public function body(string|array $state, array $questions, string $model): array
     {
         return ['state' => $state, 'model' => $model, 'questions' => $questions];

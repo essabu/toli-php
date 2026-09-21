@@ -22,6 +22,11 @@ final readonly class Gateway implements Transport
         return rtrim($this->base, '/').'/v1/ask';
     }
 
+    public function kindsUrl(): string
+    {
+        return rtrim($this->base, '/').'/v1/kinds';
+    }
+
     public function body(string|array $state, array $questions, string $model): array
     {
         return ['state' => $state, 'model' => $model, 'questions' => $questions];
